@@ -82,22 +82,20 @@ func _p4dec32(input []byte, output []uint32, b, bx byte) (read int) {
 	for i = 0; i < n/64; i++ {
 		bb[i] = binary.LittleEndian.Uint64(input)
 		num += bits.OnesCount64(bb[i])
-		//input = input[8:]
+		input = input[8:]
 	}
 	if rest := n % 64; rest != 0 {
 		bb[i] = binary.LittleEndian.Uint64(input) & ((1 << uint(rest)) - 1)
 		num += bits.OnesCount64(bb[i])
-		//input = input[1:]
+		input = input[(rest+7)/8:]
 	}
-	log.Printf("DBG: skipping %d bytes for n=%d", (n+7)/8, n)
-	input = input[(n+7)/8:]
 
 	exceptions := make([]uint32, num)
 	input = input[bitunpack32(input, exceptions, bx):]
 	input = input[bitunpack32(input, output, b):]
 
-	log.Printf("exceptions: %x", exceptions)
-	log.Printf("output: %x (len %d)", output, len(output))
+	//log.Printf("exceptions: %x", exceptions)
+	//log.Printf("output: %x (len %d)", output, len(output))
 
 	op := 0
 	k := 0
