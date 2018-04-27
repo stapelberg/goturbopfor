@@ -72,10 +72,30 @@ func logic(idx string) error {
 		goturbopfor.P4ndec256v32(buf2, deltas2)
 
 		if !reflect.DeepEqual(deltas, deltas2) {
-			log.Printf("read %d bytes at %d for trigram %v: %v", meta.OffsetEnc-prev.OffsetEnc, prev.OffsetEnc, prev.Trigram, deltas)
+			log.Printf("read %d bytes at %d for trigram %v: %v (len: %d)", meta.OffsetEnc-prev.OffsetEnc, prev.OffsetEnc, prev.Trigram, deltas, prev.Entries)
 			log.Printf("go: %v", deltas2)
 			fmt.Printf("input: %#v,\n", buf2[:len(buffer)-32])
 			fmt.Printf("want: %#v,\n", deltas)
+			// dump to turn into a testcase
+			prefix := fmt.Sprintf("/home/michael/go/src/goturbopfor/testdata/trigram_%d", prev.Trigram)
+			want, err := os.Create(prefix + ".want")
+			if err != nil {
+				return err
+			}
+			defer want.Close()
+			if err := binary.Write(want, binary.LittleEndian, deltas); err != nil {
+				return err
+			}
+
+			input, err := os.Create(prefix + ".input")
+			if err != nil {
+				return err
+			}
+			defer input.Close()
+			if _, err := input.Write(buf2[:len(buffer)-32]); err != nil {
+				return err
+			}
+
 			break
 		}
 		prev = meta

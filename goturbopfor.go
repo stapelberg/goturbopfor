@@ -192,6 +192,7 @@ func bitunpack256v32(input []byte, output []uint32, b byte) (read int) {
 			bits -= uint(b)
 		}
 	}
+	log.Printf("output: %x (len: %d)", output, len(output))
 	return orig - len(input)
 }
 
@@ -235,6 +236,7 @@ func _bitunpack256v32(input []byte, output []uint32, b byte, exceptions []uint32
 			rbits -= uint(b)
 		}
 	}
+	log.Printf("output: %x (len: %d)", output, len(output))
 	//log.Printf("decoded: %x", output)
 	return orig - len(input)
 }
@@ -251,7 +253,7 @@ func _p4dec256v32(input []byte, output []uint32, b, bx byte) (read int) {
 	}
 	log.Printf("%d exceptions (len(input)=%d)", num, len(input))
 	input = input[bitunpack32(input, exceptions[:num], bx):]
-	log.Printf("skipped %d bytes", before-len(input))
+	log.Printf("consumed %d bytes", before-len(input))
 	input = input[_bitunpack256v32(input, output, b, exceptions[:num], pb):]
 	return before - len(input)
 }
@@ -280,7 +282,9 @@ func p4dec256v32(input []byte, output []uint32) (read int) {
 
 	case blockBitpacking:
 		log.Printf("p4dec256v32: bitpacking")
-		return 1 + bitunpack32(input, output, b)
+		consumed := bitunpack256v32(input, output, b)
+		log.Printf("output: %x (len: %d)", output, len(output))
+		return 1 + consumed
 
 	case blockBitpackingExceptions:
 		bx, input := input[0], input[1:]
@@ -310,9 +314,11 @@ func p4dec256v32(input []byte, output []uint32) (read int) {
 
 func P4ndec256v32(input []byte, fulloutput []uint32) (read int) {
 	before := len(input)
+	blockidx := 0
 	for len(fulloutput) >= 256 {
 		output := fulloutput[:256]
-		log.Printf("block start")
+		blockidx++
+		log.Printf("block %d start", blockidx)
 		input = input[p4dec256v32(input, output):]
 		log.Printf("block done")
 		fulloutput = fulloutput[256:]
