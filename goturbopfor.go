@@ -155,11 +155,11 @@ func p4dec32(input []byte, output []uint32) (read int) {
 		n, input := int(input[0]), input[1:] // number of exceptions
 		log.Printf("ip[0] = %x", input[0])
 		input = input[bitunpack32(input, output, b):]
-		log.Printf("output: %v (len: %d)", output, len(output))
+		log.Printf("output: %x (len: %d)", output, len(output))
 
 		exceptions := make([]uint32, n)
 		input = input[vbdec32(input, exceptions):]
-		log.Printf("%d exceptions: %v", n, exceptions)
+		log.Printf("%d exceptions: %x", n, exceptions)
 		log.Printf("exception idx: %v", input[:n])
 		for i := 0; i < n; i++ {
 			output[input[i]] |= exceptions[i] << b
@@ -310,12 +310,15 @@ func p4dec256v32(input []byte, output []uint32) (read int) {
 
 func P4ndec256v32(input []byte, fulloutput []uint32) (read int) {
 	before := len(input)
-	for len(fulloutput) > 256 {
+	for len(fulloutput) >= 256 {
 		output := fulloutput[:256]
 		log.Printf("block start")
 		input = input[p4dec256v32(input, output):]
 		log.Printf("block done")
 		fulloutput = fulloutput[256:]
+	}
+	if len(fulloutput) == 0 {
+		return before - len(input)
 	}
 	return before - len(input) + p4dec32(input, fulloutput)
 }
