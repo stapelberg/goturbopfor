@@ -18,23 +18,22 @@ import (
 //                  00011000
 //         101 10001
 //00001011
-func bitunpack32(input []byte, output []uint32, b byte) (read int) {
+func bitunpack32(input []byte, output []uint32, nbits byte) (read int) {
 	orig := len(input)
-	log.Printf("bitunpacking with %d bit ints (len(input)=%d, len(output)=%d)", b, len(input), len(output))
-	var bits uint
+	var rbits uint // remaining bits
 	var acc uint32 // accumulator
 	for op := 0; op < len(output); {
-		if bits < uint(b) {
+		if rbits < uint(nbits) {
 			// read one more byte
-			acc |= uint32(input[0]) << bits
+			acc |= uint32(input[0]) << rbits
 			input = input[1:]
-			bits += 8
+			rbits += 8
 		}
-		if bits >= uint(b) {
-			output[op] = acc & ((1 << b) - 1)
+		if rbits >= uint(nbits) {
+			output[op] = acc & ((1 << nbits) - 1)
 			op++
-			acc >>= b
-			bits -= uint(b)
+			acc >>= nbits
+			rbits -= uint(nbits)
 		}
 	}
 	return orig - len(input)
@@ -94,9 +93,6 @@ func _p4dec32(input []byte, output []uint32, b, bx byte) (read int) {
 	input = input[bitunpack32(input, exceptions, bx):]
 	input = input[bitunpack32(input, output, b):]
 
-	//log.Printf("exceptions: %x", exceptions)
-	//log.Printf("output: %x (len %d)", output, len(output))
-
 	op := 0
 	k := 0
 	for i := 0; i < (n+63)/64; i++ { // 64 bits of exception bitmap at a time
@@ -119,6 +115,9 @@ var (
 
 // p4dec32 decodes one block of TurboPFor-encoded 32 bit ints
 func p4dec32(input []byte, output []uint32) (read int) {
+	if len(output) == 0 {
+		return 0
+	}
 	before := len(input)            // for returning read bytes
 	b, input := input[0], input[1:] // block header
 	blockType := [2]byte{
@@ -128,12 +127,11 @@ func p4dec32(input []byte, output []uint32) (read int) {
 	b &= ^byte(0x80 | 0x40) // for bitpacking, b is the number of bits
 	switch blockType {
 	case blockConstant:
-		log.Printf("p4dec32: constant")
-		var padded [4]byte
-		copy(padded[:], input)
-		u := binary.LittleEndian.Uint32(padded[:])
+		padded := make([]byte, binary.Size(uint32(0)))
+		copy(padded, input)
+		u := binary.LittleEndian.Uint32(padded)
 		if b < 32 {
-			u = u & ((1 << b) - 1)
+			u &= ((1 << b) - 1)
 		}
 		for i := 0; i < len(output); i++ {
 			output[i] = u
@@ -141,37 +139,27 @@ func p4dec32(input []byte, output []uint32) (read int) {
 		return 1 + (int(b)+7)/8
 
 	case blockBitpacking:
-		log.Printf("p4dec32: bitpacking")
-		input = input[bitunpack32(input, output, b):]
-		return before - len(input)
+		return 1 + bitunpack32(input, output, b)
 
 	case blockBitpackingExceptions:
-		log.Printf("p4dec32: bitpacking exceptions")
 		bx, input := input[0], input[1:]
 		return before - len(input) + _p4dec32(input, output, b, bx)
 
 	default: // blockBitpackingVBExceptions
-		log.Printf("p4dec32: bitpacking vb exceptions")
 		n, input := int(input[0]), input[1:] // number of exceptions
-		log.Printf("ip[0] = %x", input[0])
 		input = input[bitunpack32(input, output, b):]
-		log.Printf("output: %x (len: %d)", output, len(output))
 
 		exceptions := make([]uint32, n)
 		input = input[vbdec32(input, exceptions):]
-		log.Printf("%d exceptions: %x", n, exceptions)
-		log.Printf("exception idx: %v", input[:n])
 		for i := 0; i < n; i++ {
 			output[input[i]] |= exceptions[i] << b
 		}
-		input = input[n:]
-		return before - len(input)
+		return before - len(input) + n
 	}
 }
 
 func bitunpack256v32(input []byte, output []uint32, b byte) (read int) {
 	orig := len(input)
-	log.Printf("bitunpacking with %d bit ints", b)
 	var bits uint
 	var acc [8]uint64 // accumulator
 	for op := 0; op < len(output); {
@@ -192,16 +180,11 @@ func bitunpack256v32(input []byte, output []uint32, b byte) (read int) {
 			bits -= uint(b)
 		}
 	}
-	log.Printf("output: %x (len: %d)", output, len(output))
 	return orig - len(input)
 }
 
 func _bitunpack256v32(input []byte, output []uint32, b byte, exceptions []uint32, bb []byte) (read int) {
 	orig := len(input)
-	// log.Printf("%#v", input[:96])
-	// log.Printf("bitunpacking with %d bit ints (and %d exceptions)", b, len(exceptions))
-	// log.Printf("ex: %#v", exceptions)
-	// log.Printf("bb: %#v", bb)
 	var rbits uint
 	var acc [8]uint64 // accumulator
 	for op := 0; op < len(output); {
@@ -217,13 +200,9 @@ func _bitunpack256v32(input []byte, output []uint32, b byte, exceptions []uint32
 			xm := bb[0]
 			bb = bb[1:]
 			exc := 0
-			//log.Printf("xm = %x", xm)
 			for i := 0; i < 8; i++ {
 				ov := acc[i] & ((1 << b) - 1)
 				if xm&(1<<uint(i)) != 0 {
-					//log.Printf("exception present for int %d", i)
-					//if (xm>>uint(i))&1 != 0 {
-					// exception present
 					ov |= uint64(exceptions[exc] << b)
 					exc++
 				}
@@ -231,13 +210,10 @@ func _bitunpack256v32(input []byte, output []uint32, b byte, exceptions []uint32
 				op++
 				acc[i] >>= b
 			}
-			//exceptions = exceptions[bits.OnesCount(uint(xm)):]
 			exceptions = exceptions[exc:]
 			rbits -= uint(b)
 		}
 	}
-	log.Printf("output: %x (len: %d)", output, len(output))
-	//log.Printf("decoded: %x", output)
 	return orig - len(input)
 }
 
@@ -251,15 +227,14 @@ func _p4dec256v32(input []byte, output []uint32, b, bx byte) (read int) {
 		num += bits.OnesCount64(binary.LittleEndian.Uint64(input))
 		input = input[8:]
 	}
-	log.Printf("%d exceptions (len(input)=%d)", num, len(input))
 	input = input[bitunpack32(input, exceptions[:num], bx):]
-	log.Printf("consumed %d bytes", before-len(input))
 	input = input[_bitunpack256v32(input, output, b, exceptions[:num], pb):]
 	return before - len(input)
 }
 
+// p4dec256v32 fills output from input, decoding 256 uint32s.
 func p4dec256v32(input []byte, output []uint32) (read int) {
-	before := len(input)
+	before := len(input)            // for returning read bytes
 	b, input := input[0], input[1:] // block header
 	blockType := [2]byte{
 		(b & 0x80) >> 7, // first bit
@@ -268,12 +243,11 @@ func p4dec256v32(input []byte, output []uint32) (read int) {
 	b &= ^byte(0x80 | 0x40) // for bitpacking, b is the number of bits
 	switch blockType {
 	case blockConstant:
-		log.Printf("p4dec256v32: constant")
-		var padded [4]byte
-		copy(padded[:], input)
-		u := binary.LittleEndian.Uint32(padded[:])
+		padded := make([]byte, binary.Size(uint32(0)))
+		copy(padded, input)
+		u := binary.LittleEndian.Uint32(padded)
 		if b < 32 {
-			u = u & ((1 << b) - 1)
+			u &= ((1 << b) - 1)
 		}
 		for i := 0; i < len(output); i++ {
 			output[i] = u
@@ -281,50 +255,34 @@ func p4dec256v32(input []byte, output []uint32) (read int) {
 		return 1 + (int(b)+7)/8
 
 	case blockBitpacking:
-		log.Printf("p4dec256v32: bitpacking")
-		consumed := bitunpack256v32(input, output, b)
-		log.Printf("output: %x (len: %d)", output, len(output))
-		return 1 + consumed
+		return 1 + bitunpack256v32(input, output, b)
 
 	case blockBitpackingExceptions:
 		bx, input := input[0], input[1:]
-		log.Printf("p4dec256v32: bitpacking with exceptions, bx = %x", bx)
-		input = input[_p4dec256v32(input, output, b, bx):]
-		return before - len(input)
+		return before - len(input) + _p4dec256v32(input, output, b, bx)
 
 	default: // blockBitpackingVBExceptions
-		log.Printf("p4dec256v32: bitpacking with vb exceptions")
 		n, input := int(input[0]), input[1:] // number of exceptions
 		input = input[bitunpack256v32(input, output, b):]
-		log.Printf("output: %x (len %d)", output, len(output))
-		for i := 0; i < len(output); i += 8 {
-			log.Printf("  chunk %d: %x", i, output[i:i+8])
-		}
 
 		exceptions := make([]uint32, n)
 		input = input[vbdec32(input, exceptions):]
-		log.Printf("exceptions: %x (%d)", exceptions, n)
 		for i := 0; i < n; i++ {
 			output[input[i]] |= exceptions[i] << b
 		}
-		log.Printf("output: %x (len %d)", output, len(output))
 		return before - len(input) + n
 	}
 }
 
-func P4ndec256v32(input []byte, fulloutput []uint32) (read int) {
+// P4ndec256v32 fills output from input, decoding 256 uint32s at a time.
+//
+// Note that different decoding algorithms are used for the last block, if that
+// block does not contain 256 uint32s.
+func P4ndec256v32(input []byte, output []uint32) (read int) {
 	before := len(input)
-	blockidx := 0
-	for len(fulloutput) >= 256 {
-		output := fulloutput[:256]
-		blockidx++
-		log.Printf("block %d start", blockidx)
-		input = input[p4dec256v32(input, output):]
-		log.Printf("block done")
-		fulloutput = fulloutput[256:]
+	for len(output) >= 256 {
+		input = input[p4dec256v32(input, output[:256]):]
+		output = output[256:]
 	}
-	if len(fulloutput) == 0 {
-		return before - len(input)
-	}
-	return before - len(input) + p4dec32(input, fulloutput)
+	return before - len(input) + p4dec32(input, output)
 }
