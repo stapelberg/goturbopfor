@@ -140,6 +140,93 @@ func TestDecodeFromFile(t *testing.T) {
 	}
 }
 
+func TestVbdec32(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		input []byte
+		want  []uint32
+	}{
+		{
+			name:  "first1", // first value fitting in 1 byte
+			input: []byte{0x00},
+			want:  []uint32{0},
+		},
+
+		{
+			name:  "last1", // last value fitting in 1 byte
+			input: []byte{0xb0},
+			want:  []uint32{176},
+		},
+
+		{
+			name:  "first2", // first value fitting in 2 bytes
+			input: []byte{0xb1, 0x00},
+			want:  []uint32{177},
+		},
+
+		{
+			name:  "last2", // last value fitting in 2 bytes
+			input: []byte{0xf0, 0xff},
+			want:  []uint32{16560},
+		},
+
+		{
+			name:  "first3", // first value fitting in 3 bytes
+			input: []byte{0xf1, 0x00, 0x00},
+			want:  []uint32{16561},
+		},
+
+		{
+			name:  "last3", // last value fitting in 3 bytes
+			input: []byte{0xf8, 0xff, 0xff},
+			want:  []uint32{540848},
+		},
+
+		{
+			name:  "first4", // first value fitting in 4 bytes
+			input: []byte{0xf9, 0xb1, 0x40, 0x08},
+			want:  []uint32{540849},
+		},
+
+		{
+			name:  "last4", // last value fitting in 4 bytes
+			input: []byte{0xf9, 0xff, 0xff, 0xff},
+			want:  []uint32{16777215},
+		},
+
+		{
+			name:  "first5", // first value fitting in 5 bytes (overflow)
+			input: []byte{0xff, 0x00, 0x00, 0x00, 0x01},
+			want:  []uint32{16777216},
+		},
+
+		{
+			name:  "last5", // last value fitting in 5 bytes (overflow)
+			input: []byte{0xff, 0xff, 0xff, 0xff, 0xff},
+			want:  []uint32{4294967295},
+		},
+
+		{
+			name:  "multi5", // multiple values, exercising the 5 bytes
+			input: []byte{0x00, 0x00, 0x00, 0xfa, 0xff, 0xff, 0xff, 0xff},
+			want:  []uint32{0, 0, 0, 4294967295},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			padded := make([]byte, len(test.input)*4)
+			copy(padded, test.input)
+			output := make([]uint32, len(test.want))
+			read := vbdec32(padded, output)
+			if got, want := read, len(test.input); got != want {
+				t.Fatalf("vbdec32 read %d, want %d", got, want)
+			}
+			if got, want := output, test.want; !reflect.DeepEqual(got, want) {
+				t.Fatalf("vbdec32: got %d, want %d", got, want)
+			}
+		})
+	}
+}
+
 func Test_Bitunpack256v32(t *testing.T) {
 	for _, test := range []struct {
 		name       string

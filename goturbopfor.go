@@ -2,7 +2,6 @@ package goturbopfor
 
 import (
 	"encoding/binary"
-	"log"
 	"math/bits"
 )
 
@@ -20,47 +19,69 @@ import (
 //00001011
 func bitunpack32(input []byte, output []uint32, nbits byte) (read int) {
 	orig := len(input)
-	var rbits uint // remaining bits
+	var rbits byte // remaining bits
 	var acc uint32 // accumulator
 	for op := 0; op < len(output); {
-		if rbits < uint(nbits) {
-			// read one more byte
+		if rbits < nbits {
+			// shift in one more byte
 			acc |= uint32(input[0]) << rbits
 			input = input[1:]
 			rbits += 8
 		}
-		if rbits >= uint(nbits) {
+		if rbits >= nbits {
 			output[op] = acc & ((1 << nbits) - 1)
 			op++
 			acc >>= nbits
-			rbits -= uint(nbits)
+			rbits -= nbits
 		}
 	}
 	return orig - len(input)
 }
 
+// vbdec32 fills output from input, decoding variable byte uint32s.
+//
+// The variable byte encoding is similar to:
+// https://sqlite.org/src4/doc/trunk/www/varint.wiki
+// https://github.com/stoklund/varint
+//
+// [       0-       176] are stored in 1 byte (as-is)
+// [     177-     16560] are stored in 2 bytes, with the highest 6 bits added to 177
+// [   16561-    540848] are stored in 3 bytes, with the highest 3 bits added to 241
+// [  540849-  16777215] are stored in 4 bytes, with 0 added to 249
+// [16777216-4294967295] are stored in 5 bytes, with 1 added to 249
+//
+// An overflow marker will be used to signal that encoding the
+// values would be less space-efficient than simply copying them
+// (e.g. if all values require 5 bytes).
 func vbdec32(input []byte, output []uint32) (read int) {
-	if input[0] == 0xff {
-		log.Fatal("memcpy not implemented")
-		// TODO: memcpy
-	}
 	before := len(input)
+	if input[0] == 0xff {
+		// overflow, memcpy the data as-is:
+		input = input[1:]
+		for op := 0; op < len(output); op++ {
+			output[op] = binary.LittleEndian.Uint32(input)
+			input = input[4:]
+		}
+		return before - len(input)
+	}
 	for op := 0; op < len(output); op++ {
 		x := uint32(input[0])
 		input = input[1:]
 		if x < 177 {
 		} else if x < 241 {
-			x = (x << 8) + uint32(input[0]) - 0xb04f
+			x = uint32(input[0]) +
+				((x - 177) << 8) +
+				177
 			input = input[1:]
 		} else if x < 249 {
-			x = (uint32(input[0]) + (uint32(input[1]) << 8)) +
+			x = (uint32(input[0]) << 0) +
+				(uint32(input[1]) << 8) +
 				((x - 241) << 16) +
 				16561
 			input = input[2:]
 		} else {
-			_b := x - 249
-			x = (uint32(input[0]) + (uint32(input[1]) << 8) + (uint32(input[2]) << 16) + (uint32(input[3]) << 24)) &
-				(((1 << (8 * _b)) << 24) - 1)
+			_b := x - 249 // _b in [0, 1]
+			x = binary.LittleEndian.Uint32(input) & (((1 << (8 * _b)) << 24) - 1)
 			input = input[3+_b:]
 		}
 		output[op] = x
@@ -96,8 +117,9 @@ func _p4dec32(input []byte, output []uint32, b, bx byte) (read int) {
 	op := 0
 	k := 0
 	for i := 0; i < (n+63)/64; i++ { // 64 bits of exception bitmap at a time
-		for u := bb[i]; u != 0; u &= u - 1 { // bit-wise
-			output[op+bits.TrailingZeros64(u)] += exceptions[k] << b
+		for u := bb[i]; u != 0; u &= u - 1 { // zero the right-most bit
+			ctz64 := bits.TrailingZeros64(u) // locate the right-most 1
+			output[op+ctz64] += exceptions[k] << b
 			k++
 		}
 		op += 64
@@ -107,10 +129,17 @@ func _p4dec32(input []byte, output []uint32, b, bx byte) (read int) {
 }
 
 var (
-	blockBitpacking             = [2]byte{0, 0}
-	blockBitpackingExceptions   = [2]byte{1, 0}
+	// bitpacked values (no exceptions)
+	blockBitpacking = [2]byte{0, 0}
+
+	// exception presence bitmap + bitpacked exception values
+	blockBitpackingExceptions = [2]byte{1, 0}
+
+	// variable byte encoded exception values and exception index bytes
 	blockBitpackingVBExceptions = [2]byte{0, 1}
-	blockConstant               = [2]byte{1, 1}
+
+	// constant value for entire block
+	blockConstant = [2]byte{1, 1}
 )
 
 // p4dec32 decodes one block of TurboPFor-encoded 32 bit ints
