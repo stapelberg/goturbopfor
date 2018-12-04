@@ -37,12 +37,12 @@ func bitunpack32(input []byte, output []uint32, nbits byte) (read int) {
 	return orig - len(input)
 }
 
-func bitunpack256v32(input []byte, output []uint32, b byte) (read int) {
+func bitunpack256v32(input []byte, output []uint32, nbits byte) (read int) {
 	orig := len(input)
 	var bits uint
 	var acc [8]uint64 // accumulator
 	for op := 0; op < len(output); {
-		if bits < uint(b) {
+		if bits < uint(nbits) {
 			// read 8 more uint32s
 			for i := 0; i < 8; i++ {
 				acc[i] |= uint64(binary.LittleEndian.Uint32(input)) << bits
@@ -50,13 +50,13 @@ func bitunpack256v32(input []byte, output []uint32, b byte) (read int) {
 			}
 			bits += 32
 		}
-		if bits >= uint(b) {
+		if bits >= uint(nbits) {
 			for i := 0; i < 8; i++ {
-				output[op] = uint32(acc[i] & ((1 << b) - 1))
+				output[op] = uint32(acc[i] & ((1 << nbits) - 1))
 				op++
-				acc[i] >>= b
+				acc[i] >>= nbits
 			}
-			bits -= uint(b)
+			bits -= uint(nbits)
 		}
 	}
 	return orig - len(input)
