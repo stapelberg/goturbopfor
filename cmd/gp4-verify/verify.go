@@ -49,7 +49,10 @@ func (me *MetaEntry) Unmarshal(b []byte) {
 // turn into a compile-time constant yet.
 const metaEntrySize = 16
 
-var totalBytes uint64
+var (
+	totalBytes   uint64
+	totalEntries uint64
+)
 
 func init() {
 	go func() {
@@ -147,6 +150,7 @@ func logic(idx string) error {
 		}
 		blockLen := meta.OffsetData - prev.OffsetData
 		atomic.AddUint64(&totalBytes, uint64(blockLen+metaEntrySize))
+		atomic.AddUint64(&totalEntries, uint64(prev.Entries))
 		work <- prev
 		prev = meta
 	}
@@ -220,4 +224,5 @@ func main() {
 	}
 	val := atomic.LoadUint64(&totalBytes)
 	log.Printf("rate: %.2f bytes/s", float64(val)/float64(time.Since(start).Nanoseconds())*float64(time.Second))
+	log.Printf("total: %d entries", atomic.LoadUint64(&totalEntries))
 }
