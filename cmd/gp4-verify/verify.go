@@ -18,8 +18,6 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"goturbopfor"
-	"goturbopfor/internal/mmap"
 	"log"
 	"net/http"
 	"os"
@@ -31,10 +29,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"turbopfor"
+
 	// go get github.com/Debian/dcs/internal/turbopfor
 	// ln -s github.com/Debian/dcs/internal/turbopfor turbopfor
 	// </hackerman>
+	"turbopfor"
+
+	"github.com/stapelberg/goturbopfor"
+	"github.com/stapelberg/goturbopfor/internal/mmap"
 )
 
 var (
