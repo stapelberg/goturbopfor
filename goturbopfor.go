@@ -145,6 +145,8 @@ var (
 
 type decoder struct {
 	bitunpack func(input []byte, output []uint32, b byte) int
+	scratch   []uint32
+	pad       [4]byte
 }
 
 var (
@@ -160,6 +162,10 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 	if len(output) == 0 {
 		return 0
 	}
+	if d.scratch == nil {
+		const maxBlockSize = 256
+		d.scratch = make([]uint32, 0, maxBlockSize)
+	}
 	before := len(input)            // for returning read bytes
 	b, input := input[0], input[1:] // block header
 	blockType := [2]byte{
@@ -169,7 +175,7 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 	b &= ^byte(0x80 | 0x40) // for bitpacking, b is the number of bits
 	switch blockType {
 	case blockConstant:
-		padded := make([]byte, binary.Size(uint32(0)))
+		padded := d.pad[:binary.Size(uint32(0))]
 		copy(padded, input)
 		u := binary.LittleEndian.Uint32(padded)
 		if b < 32 {
@@ -196,7 +202,7 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 		}
 		input = input[(n+7)/8:]
 
-		exceptions := make([]uint32, nex)
+		exceptions := d.scratch[:nex]
 		input = input[bitunpack32(input, exceptions, bx):]
 		input = input[d.bitunpack(input, output, b):]
 
@@ -213,7 +219,7 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 		nex, input := int(input[0]), input[1:] // number of exceptions
 		input = input[d.bitunpack(input, output, b):]
 
-		exceptions := make([]uint32, nex)
+		exceptions := d.scratch[:nex]
 		input = input[vbdec32(input, exceptions):]
 		for i := 0; i < nex; i++ {
 			output[input[i]] |= exceptions[i] << b
