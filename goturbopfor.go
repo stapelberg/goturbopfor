@@ -25,11 +25,13 @@ import (
 // → 0101010, 0111001, xxxxx10, …
 //
 // longer values:
-// 1120345    (100010001100001011001)
-//                          01011001
-//                  00011000
-//         101 10001
-//00001011
+//
+//	1120345    (100010001100001011001)
+//	                         01011001
+//	                 00011000
+//	        101 10001
+//
+// 00001011
 func bitunpack32(input []byte, output []uint32, nbits byte) (read int) {
 	orig := len(input)
 	var rbits byte // remaining bits
