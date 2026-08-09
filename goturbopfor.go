@@ -54,30 +54,35 @@ func bitunpack32(input []byte, output []uint32, nbits byte) (read int) {
 	return orig - len(input)
 }
 
-func bitunpack256v32(input []byte, output []uint32, nbits byte) (read int) {
+func bitunpack256v32(fullinput []byte, fulloutput []uint32, nbits byte) (read int) {
+	output := fulloutput[:256]
 	if nbits == 0 {
-		clear(output[:256])
+		clear(output)
 		return 0
 	}
+	n := 32 * int(nbits)
+	input := fullinput[:n] // tell the Go compiler how long the input is
 	var bits uint
 	var acc [8]uint64 // accumulator
 	pos := 0
 	for op := 0; op < 256; op += 8 {
 		if bits < uint(nbits) {
 			// read 8 more uint32s
+			row := input[pos : pos+32]
 			for i := range 8 {
-				acc[i] |= uint64(binary.LittleEndian.Uint32(input[pos+i*4:])) << bits
+				acc[i] |= uint64(binary.LittleEndian.Uint32(row[i*4:])) << bits
 			}
 			bits += 32
 			pos += 32
 		}
+		out8 := output[op : op+8]
 		for i := range 8 {
-			output[op+i] = uint32(acc[i] & ((1 << nbits) - 1))
+			out8[i] = uint32(acc[i] & ((1 << nbits) - 1))
 			acc[i] >>= nbits
 		}
 		bits -= uint(nbits)
 	}
-	return 32 * int(nbits)
+	return n
 }
 
 // vbdec32 fills output from input, decoding variable byte uint32s.
