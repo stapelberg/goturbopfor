@@ -281,3 +281,22 @@ func TestVbdec32(t *testing.T) {
 // 		}
 // 	}
 // }
+
+func TestBitunpack32(t *testing.T) {
+	// 3 values of length 30 bit each.
+	input := []byte{
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0x03,
+	}
+	want := []uint32{0x3fffffff, 0x3fffffff, 0x3fffffff}
+
+	got := make([]uint32, len(want))
+	if read := bitunpack32(input, got, 30); read != len(input) {
+		t.Errorf("bitunpack32 read %d bytes, want %d", read, len(input))
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("value %d = %#x, want %#x", i, got[i], w)
+		}
+	}
+}

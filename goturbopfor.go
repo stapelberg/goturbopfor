@@ -35,16 +35,16 @@ import (
 func bitunpack32(input []byte, output []uint32, nbits byte) (read int) {
 	orig := len(input)
 	var rbits byte // remaining bits
-	var acc uint32 // accumulator
+	var acc uint64 // accumulator
 	for op := 0; op < len(output); {
 		if rbits < nbits {
 			// shift in one more byte
-			acc |= uint32(input[0]) << rbits
+			acc |= uint64(input[0]) << rbits
 			input = input[1:]
 			rbits += 8
 		}
 		if rbits >= nbits {
-			output[op] = acc & ((1 << nbits) - 1)
+			output[op] = uint32(acc & ((1 << nbits) - 1))
 			op++
 			acc >>= nbits
 			rbits -= nbits
