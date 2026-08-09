@@ -85,7 +85,7 @@ func TestDecode(t *testing.T) {
 			padded := make([]byte, len(test.input)+32)
 			copy(padded, test.input)
 			//padded = padded[:len(test.input)]
-			num := P4ndec256v32(test.input, buffer)
+			num := NewDecoder().P4ndec256v32(test.input, buffer)
 			if got, want := num, len(test.input); got != want {
 				t.Fatalf("read: got %d, want %d", got, want)
 			}
@@ -130,7 +130,7 @@ func TestDecodeFromFile(t *testing.T) {
 			padded := make([]byte, len(input)+32)
 			copy(padded, input)
 			//padded = padded[:len(input)]
-			num := P4ndec256v32(input, buffer)
+			num := NewDecoder().P4ndec256v32(input, buffer)
 			if got, want := num, len(input); got != want {
 				t.Fatalf("read: got %d, want %d", got, want)
 			}

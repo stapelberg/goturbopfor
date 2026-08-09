@@ -174,13 +174,20 @@ type decoder struct {
 	pad       [4]byte
 }
 
-var (
+// Decoder is not safe for concurrent use by multiple goroutines.
+type Decoder struct {
 	// v256 is a decoder which operates on 256 uint32s.
-	v256 = decoder{bitunpack: bitunpack256v32}
-
+	v256 decoder
 	// remainder is a decoder which handles the remaining (<256) uint32s.
-	remainder = decoder{bitunpack: bitunpack32}
-)
+	remainder decoder
+}
+
+func NewDecoder() *Decoder {
+	return &Decoder{
+		v256:      decoder{bitunpack: bitunpack256v32},
+		remainder: decoder{bitunpack: bitunpack32},
+	}
+}
 
 // p4dec32 decodes one block of TurboPFor-encoded 32 bit ints
 func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
@@ -281,11 +288,11 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 //
 // Note that different decoding algorithms are used for the last block, if that
 // block does not contain 256 uint32s.
-func P4ndec256v32(input []byte, output []uint32) (read int) {
+func (d *Decoder) P4ndec256v32(input []byte, output []uint32) (read int) {
 	before := len(input)
 	for len(output) >= 256 {
-		input = input[v256.p4dec32(input, output[:256]):]
+		input = input[d.v256.p4dec32(input, output[:256]):]
 		output = output[256:]
 	}
-	return before - len(input) + remainder.p4dec32(input, output)
+	return before - len(input) + d.remainder.p4dec32(input, output)
 }
