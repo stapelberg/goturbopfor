@@ -55,28 +55,29 @@ func bitunpack32(input []byte, output []uint32, nbits byte) (read int) {
 }
 
 func bitunpack256v32(input []byte, output []uint32, nbits byte) (read int) {
-	orig := len(input)
+	if nbits == 0 {
+		clear(output[:256])
+		return 0
+	}
 	var bits uint
 	var acc [8]uint64 // accumulator
-	for op := 0; op < len(output); {
+	pos := 0
+	for op := 0; op < 256; op += 8 {
 		if bits < uint(nbits) {
 			// read 8 more uint32s
 			for i := range 8 {
-				acc[i] |= uint64(binary.LittleEndian.Uint32(input)) << bits
-				input = input[4:]
+				acc[i] |= uint64(binary.LittleEndian.Uint32(input[pos+i*4:])) << bits
 			}
 			bits += 32
+			pos += 32
 		}
-		if bits >= uint(nbits) {
-			for i := range 8 {
-				output[op] = uint32(acc[i] & ((1 << nbits) - 1))
-				op++
-				acc[i] >>= nbits
-			}
-			bits -= uint(nbits)
+		for i := range 8 {
+			output[op+i] = uint32(acc[i] & ((1 << nbits) - 1))
+			acc[i] >>= nbits
 		}
+		bits -= uint(nbits)
 	}
-	return orig - len(input)
+	return 32 * int(nbits)
 }
 
 // vbdec32 fills output from input, decoding variable byte uint32s.
