@@ -70,17 +70,34 @@ func bitunpack256v32(fullinput []byte, fulloutput []uint32, nbits byte) (read in
 		if bits < uint(nbits) {
 			// read 8 more uint32s
 			row := input[pos : pos+32]
-			for i := range 8 {
-				acc[i] |= uint64(binary.LittleEndian.Uint32(row[i*4:])) << bits
-			}
+			acc[0] |= uint64(binary.LittleEndian.Uint32(row[0:])) << bits
+			acc[1] |= uint64(binary.LittleEndian.Uint32(row[4:])) << bits
+			acc[2] |= uint64(binary.LittleEndian.Uint32(row[8:])) << bits
+			acc[3] |= uint64(binary.LittleEndian.Uint32(row[12:])) << bits
+			acc[4] |= uint64(binary.LittleEndian.Uint32(row[16:])) << bits
+			acc[5] |= uint64(binary.LittleEndian.Uint32(row[20:])) << bits
+			acc[6] |= uint64(binary.LittleEndian.Uint32(row[24:])) << bits
+			acc[7] |= uint64(binary.LittleEndian.Uint32(row[28:])) << bits
 			bits += 32
 			pos += 32
 		}
 		out8 := output[op : op+8]
-		for i := range 8 {
-			out8[i] = uint32(acc[i] & mask)
-			acc[i] >>= nbits
-		}
+		out8[0] = uint32(acc[0] & mask)
+		acc[0] >>= nbits
+		out8[1] = uint32(acc[1] & mask)
+		acc[1] >>= nbits
+		out8[2] = uint32(acc[2] & mask)
+		acc[2] >>= nbits
+		out8[3] = uint32(acc[3] & mask)
+		acc[3] >>= nbits
+		out8[4] = uint32(acc[4] & mask)
+		acc[4] >>= nbits
+		out8[5] = uint32(acc[5] & mask)
+		acc[5] >>= nbits
+		out8[6] = uint32(acc[6] & mask)
+		acc[6] >>= nbits
+		out8[7] = uint32(acc[7] & mask)
+		acc[7] >>= nbits
 		bits -= uint(nbits)
 	}
 	return n
