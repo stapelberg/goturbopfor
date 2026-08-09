@@ -206,10 +206,11 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 		input = input[bitunpack32(input, exceptions, bx):]
 		input = input[d.bitunpack(input, output, b):]
 
+		j := 0
 		for i := range n {
 			if exmap[i/8]&(1<<uint(i%8)) != 0 {
-				output[i] += exceptions[0] << b
-				exceptions = exceptions[1:]
+				output[i] += exceptions[j] << b
+				j++
 			}
 		}
 
