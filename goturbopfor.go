@@ -60,6 +60,7 @@ func bitunpack256v32(fullinput []byte, fulloutput []uint32, nbits byte) (read in
 		clear(output)
 		return 0
 	}
+	mask := uint64(1)<<nbits - 1
 	n := 32 * int(nbits)
 	input := fullinput[:n] // tell the Go compiler how long the input is
 	var bits uint
@@ -77,7 +78,7 @@ func bitunpack256v32(fullinput []byte, fulloutput []uint32, nbits byte) (read in
 		}
 		out8 := output[op : op+8]
 		for i := range 8 {
-			out8[i] = uint32(acc[i] & ((1 << nbits) - 1))
+			out8[i] = uint32(acc[i] & mask)
 			acc[i] >>= nbits
 		}
 		bits -= uint(nbits)
