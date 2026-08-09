@@ -93,7 +93,7 @@ func TestDecode(t *testing.T) {
 				t.Fatalf("len: got %d, want %d", got, want)
 			}
 			mismatch := 0
-			for i := 0; i < len(buffer); i++ {
+			for i := range buffer {
 				if buffer[i] != test.want[i] {
 					mismatch++
 				}
@@ -138,7 +138,7 @@ func TestDecodeFromFile(t *testing.T) {
 				t.Fatalf("len: got %d, want %d", got, want)
 			}
 			mismatch := 0
-			for i := 0; i < len(buffer); i++ {
+			for i := range buffer {
 				if buffer[i] != want[i] {
 					t.Logf("index %d: got %x, want %x", i, buffer[i], want[i])
 					mismatch++

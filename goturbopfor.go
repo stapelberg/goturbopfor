@@ -60,14 +60,14 @@ func bitunpack256v32(input []byte, output []uint32, nbits byte) (read int) {
 	for op := 0; op < len(output); {
 		if bits < uint(nbits) {
 			// read 8 more uint32s
-			for i := 0; i < 8; i++ {
+			for i := range 8 {
 				acc[i] |= uint64(binary.LittleEndian.Uint32(input)) << bits
 				input = input[4:]
 			}
 			bits += 32
 		}
 		if bits >= uint(nbits) {
-			for i := 0; i < 8; i++ {
+			for i := range 8 {
 				output[op] = uint32(acc[i] & ((1 << nbits) - 1))
 				op++
 				acc[i] >>= nbits
@@ -98,13 +98,13 @@ func vbdec32(input []byte, output []uint32) (read int) {
 	if input[0] == 0xff {
 		// overflow, memcpy the data as-is:
 		input = input[1:]
-		for op := 0; op < len(output); op++ {
+		for op := range output {
 			output[op] = binary.LittleEndian.Uint32(input)
 			input = input[4:]
 		}
 		return before - len(input)
 	}
-	for op := 0; op < len(output); op++ {
+	for op := range output {
 		x := uint32(input[0])
 		input = input[1:]
 		if x < 177 {
@@ -181,7 +181,7 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 		if b < 32 {
 			u &= ((1 << b) - 1)
 		}
-		for i := 0; i < len(output); i++ {
+		for i := range output {
 			output[i] = u
 		}
 		return 1 + (int(b)+7)/8
@@ -195,7 +195,7 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 
 		exmap := input
 		nex := 0 // number of exceptions
-		for i := 0; i < n; i++ {
+		for i := range n {
 			if exmap[i/8]&(1<<uint(i%8)) != 0 {
 				nex++
 			}
@@ -206,7 +206,7 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 		input = input[bitunpack32(input, exceptions, bx):]
 		input = input[d.bitunpack(input, output, b):]
 
-		for i := 0; i < n; i++ {
+		for i := range n {
 			if exmap[i/8]&(1<<uint(i%8)) != 0 {
 				output[i] += exceptions[0] << b
 				exceptions = exceptions[1:]
@@ -221,7 +221,7 @@ func (d *decoder) p4dec32(input []byte, output []uint32) (read int) {
 
 		exceptions := d.scratch[:nex]
 		input = input[vbdec32(input, exceptions):]
-		for i := 0; i < nex; i++ {
+		for i := range nex {
 			output[input[i]] |= exceptions[i] << b
 		}
 		return before - len(input) + nex
