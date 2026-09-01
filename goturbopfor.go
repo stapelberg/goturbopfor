@@ -66,14 +66,12 @@ func bitunpack256v32(input []byte, output []uint32, nbits byte) (read int) {
 			}
 			bits += 32
 		}
-		if bits >= uint(nbits) {
-			for i := range 8 {
-				output[op] = uint32(acc[i] & ((1 << nbits) - 1))
-				op++
-				acc[i] >>= nbits
-			}
-			bits -= uint(nbits)
+		for i := range 8 {
+			output[op] = uint32(acc[i] & ((1 << nbits) - 1))
+			op++
+			acc[i] >>= nbits
 		}
+		bits -= uint(nbits)
 	}
 	return orig - len(input)
 }
